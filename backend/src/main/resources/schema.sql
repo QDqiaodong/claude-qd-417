@@ -41,9 +41,15 @@ CREATE TABLE IF NOT EXISTS enrollment (
     course_id   BIGINT      NOT NULL,
     status      VARCHAR(20) NOT NULL,
     enroll_date VARCHAR(20) NOT NULL,
+    -- active_member_id 为生成列：已报名时等于 member_id，其余状态（已退）为 NULL。
+    -- 配 (course_id, active_member_id) 唯一索引 → 同一会员在同一课程至多一条「已报」记录，
+    -- 是报名事务 FOR UPDATE 行锁之外的数据库级兜底：哪怕两个窗口的报名同时落库，
+    -- 数据库也只接受一条，另一条整单失败。已退记录该列为 NULL，不受唯一约束限制，可退了再报。
+    active_member_id BIGINT GENERATED ALWAYS AS (CASE WHEN status = '已报' THEN member_id ELSE NULL END) VIRTUAL,
     PRIMARY KEY (id),
     KEY idx_enr_member (member_id),
-    KEY idx_enr_course (course_id)
+    KEY idx_enr_course (course_id),
+    UNIQUE KEY uk_enr_active (course_id, active_member_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 浇冰窗口：临时占用某块冰面的一段时间，磨冰车作业。
@@ -122,7 +128,8 @@ INSERT INTO course (id, lane_id, name, capacity, enrolled, session_date, start_t
 (5, 1, '成人周末班',      6,  1, '2026-09-21', '19:00', '20:30'),
 (6, 2, '竞技预备队',      4,  1, '2026-09-22', '16:00', '17:30');
 
--- 报名：含已退（member3 原报 course1 后退出）；已报计数与 course.enrolled 一致
+-- 报名：含已退（member3 原报 course1 后退出）；已报计数与 course.enrolled 一致。
+-- (course_id, 已报时的 member_id) 唯一：已退记录不占唯一约束，同会员退了还能再报。
 INSERT INTO enrollment (id, member_id, course_id, status, enroll_date) VALUES
 (1,  1, 1, '已报', '2026-09-01'),
 (2,  2, 1, '已报', '2026-09-02'),
@@ -134,7 +141,7 @@ INSERT INTO enrollment (id, member_id, course_id, status, enroll_date) VALUES
 (8,  2, 4, '已报', '2026-09-09'),
 (9,  4, 4, '已报', '2026-09-10'),
 (10, 6, 4, '已报', '2026-09-11'),
-(11, 1, 4, '已报', '2026-09-12'),
+(11, 5, 4, '已报', '2026-09-12'),
 (12, 1, 5, '已报', '2026-09-13'),
 (13, 2, 6, '已报', '2026-09-14'),
 (14, 3, 1, '已退', '2026-07-01');

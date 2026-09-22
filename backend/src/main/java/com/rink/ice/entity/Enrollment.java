@@ -10,6 +10,9 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "enrollment")
 public class Enrollment {
+    public static final String STATUS_ACTIVE = "已报";
+    public static final String STATUS_WITHDRAWN = "已退";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;

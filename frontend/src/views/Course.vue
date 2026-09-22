@@ -18,8 +18,9 @@
         </div>
         <el-progress :percentage="pct(c)" :stroke-width="10" />
         <el-button type="primary" size="small" class="enroll-btn"
-                   :disabled="c.resurfacing" @click="openEnroll(c)">
-          {{ c.resurfacing ? '浇冰中 · 暂停报名' : '报名' }}
+                   :disabled="c.resurfacing || c.enrolled >= c.capacity"
+                   @click="openEnroll(c)">
+          {{ c.resurfacing ? '浇冰中 · 暂停报名' : (c.enrolled >= c.capacity ? '已满员' : '报名') }}
         </el-button>
         <el-button size="small" class="skate-btn" @click="goRent(c)">⛸ 发冰刀</el-button>
       </div>

@@ -72,14 +72,12 @@ public class CourseService {
         if (f.name != null && !f.name.isBlank()) e.name = f.name;
         if (f.capacity != null) {
             if (f.capacity <= 0) throw new BizException("课程容量必须大于 0");
-            if (f.capacity < e.enrolled) throw new BizException("容量不能小于当前已报人数 " + e.enrolled);
+            // 允许把容量改到当前已报人数以下：已报名的学员不被清退（只压不踢），
+            // 报名事务在锁下按新容量判定，enrolled >= capacity 期间新报名立即被拦；
+            // 容量改回去/改大后无需任何额外操作，下一次报名自然按新容量放行。
             e.capacity = f.capacity;
         }
-        if (f.enrolled != null) {
-            if (f.enrolled < 0) throw new BizException("已报人数不能为负");
-            if (f.enrolled > e.capacity) throw new BizException("已报人数不可超过容量 " + e.capacity);
-            e.enrolled = f.enrolled;
-        }
+        // enrolled 是名额占用的派生计数，只由报名/退课事务维护，不接受柜台直接改写
         // 排期字段允许随课程编辑；浇冰窗口不挪课，只冻新报名
         if (f.sessionDate != null || f.startTime != null || f.endTime != null) {
             validateSchedule(f);
