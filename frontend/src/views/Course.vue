@@ -36,7 +36,7 @@
       </el-form>
       <template #footer>
         <el-button @click="show = false">取消</el-button>
-        <el-button type="primary" @click="enroll">确认报名</el-button>
+        <el-button type="primary" :loading="enrolling" @click="enroll">确认报名</el-button>
       </template>
     </el-dialog>
   </div>
@@ -56,6 +56,7 @@ const lanes = ref([])
 const show = ref(false)
 const current = ref(null)
 const memberId = ref(null)
+const enrolling = ref(false)
 
 const laneMap = computed(() => Object.fromEntries(lanes.value.map(l => [l.id, l])))
 function laneCode(id) { const l = laneMap.value[id]; return l ? (l.code + ' ' + l.name) : '—' }
@@ -73,9 +74,15 @@ async function load() {
 function openEnroll(c) { current.value = c; memberId.value = null; show.value = true }
 function goRent(c) { router.push({ path: '/rentals', query: { courseId: c.id } }) }
 async function enroll() {
-  await http.post('/enrollments', { memberId: memberId.value, courseId: current.value.id })
-  show.value = false
-  await load()
+  if (enrolling.value) return
+  enrolling.value = true
+  try {
+    await http.post('/enrollments', { memberId: memberId.value, courseId: current.value.id })
+    show.value = false
+    await load()
+  } finally {
+    enrolling.value = false
+  }
 }
 onMounted(load)
 </script>

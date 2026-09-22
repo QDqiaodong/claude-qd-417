@@ -13,7 +13,8 @@
           <div class="evt-member">{{ memberName(e.memberId) }}</div>
           <div class="evt-foot">
             <el-tag size="small" :type="e.status === '已退' ? 'info' : 'success'">{{ e.status }}</el-tag>
-            <el-button v-if="e.status === '已报'" size="small" text type="danger" @click="withdraw(e)">退课</el-button>
+            <el-button v-if="e.status === '已报'" size="small" text type="danger"
+                       :loading="withdrawing.has(e.id)" @click="withdraw(e)">退课</el-button>
           </div>
         </div>
         <el-empty v-if="g.items.length === 0" :image-size="40" description="无" />
@@ -51,7 +52,17 @@ async function load() {
   const [e, c, m] = await Promise.all([http.get('/enrollments'), http.get('/courses'), http.get('/members')])
   enrollments.value = e; courses.value = c; members.value = m
 }
-async function withdraw(e) { await http.put('/enrollments/' + e.id, { status: '已退' }); await load() }
+const withdrawing = ref(new Set())
+async function withdraw(e) {
+  if (withdrawing.value.has(e.id)) return
+  withdrawing.value.add(e.id)
+  try {
+    await http.put('/enrollments/' + e.id, { status: '已退' })
+    await load()
+  } finally {
+    withdrawing.value.delete(e.id)
+  }
+}
 onMounted(load)
 </script>
 

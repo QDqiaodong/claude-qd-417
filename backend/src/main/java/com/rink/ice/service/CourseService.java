@@ -10,6 +10,7 @@ import com.rink.ice.repository.ResurfaceWindowRepository;
 import com.rink.ice.util.IceTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -60,8 +61,15 @@ public class CourseService {
         return repo.save(e);
     }
 
+    /**
+     * 改课程。容量允许从大改小（可小于当前已报人数）：已报学员不清退，
+     * 新报名由报名接口在课程行锁内按新容量立即拦，一个都不多放；
+     * 容量改回去 / 改大后无需任何额外操作，下一单报名直接按新容量放行。
+     * 全程单事务 + 课程行锁：容量调整与报名 / 退课串行，不改出中间态。
+     */
+    @Transactional
     public Course update(Long id, Course f) {
-        Course e = repo.findById(id).orElseThrow(() -> new BizException("课程不存在"));
+        Course e = repo.findByIdForUpdate(id).orElseThrow(() -> new BizException("课程不存在"));
         if (f.laneId != null) {
             IceLane lane = laneRepo.findById(f.laneId)
                     .orElseThrow(() -> new BizException("归属冰面不存在"));
@@ -72,12 +80,12 @@ public class CourseService {
         if (f.name != null && !f.name.isBlank()) e.name = f.name;
         if (f.capacity != null) {
             if (f.capacity <= 0) throw new BizException("课程容量必须大于 0");
-            if (f.capacity < e.enrolled) throw new BizException("容量不能小于当前已报人数 " + e.enrolled);
+            // 已报人数可以高于新容量（改小后自然形成），不清退、不拦截本次修改
             e.capacity = f.capacity;
         }
         if (f.enrolled != null) {
             if (f.enrolled < 0) throw new BizException("已报人数不能为负");
-            if (f.enrolled > e.capacity) throw new BizException("已报人数不可超过容量 " + e.capacity);
+            // 已报人数允许高于容量（容量改小后的合法状态），下一次报名 / 退课会按真实报名单重算
             e.enrolled = f.enrolled;
         }
         // 排期字段允许随课程编辑；浇冰窗口不挪课，只冻新报名
